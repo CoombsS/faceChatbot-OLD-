@@ -1,0 +1,24 @@
+# Deepface
+
++ Features
+    - Detect face
+        - Livestream
+    - Recognize face
+        - If in database, continue
+        - Otherwise, create new entry
+
+# Chat functionality
++ Features
+    - Create new convo history
+    - Remember past conversation history
+
+# Hardware setup
++ Features
+    - Microphone
+    - Camera 
+    - Speaker
+    - AI HAT kit 
+    - Raspberry pi
+    - OLED Screen for emotion emulation
+
+LANGSMITH
