@@ -78,15 +78,22 @@ def recognize(detectedFace):
             if results and len(results) > 0 and not results[0].empty:
                 print("DeepFace Output Structure:", results[0].columns)  # Debugging step
                 
-                # Ensure the similarity metric exists before accessing it
-                similarity_metric = "VGG-Face_cosine"
-                if similarity_metric not in results[0].columns:
-                    print(f"Error: '{similarity_metric}' key not found in DeepFace results.")
+                # Determine available similarity metric
+                similarity_metric = None
+                for metric in ["VGG-Face_cosine", "VGG-Face_euclidean", "VGG-Face_euclidean_l2"]:
+                    if metric in results[0].columns:
+                        similarity_metric = metric
+                        break
+                
+                if not similarity_metric:
+                    print("Error: No valid similarity metric found in DeepFace results.")
                     return None
 
                 identity_path = results[0]['identity'][0]
                 person_name = identity_path.split(os.sep)[-2]
                 confidence_score = results[0][similarity_metric][0]
+
+                print(f"Similarity metric used: {similarity_metric} | Confidence Score: {confidence_score:.2f}")
 
                 if confidence_score < RECOGNITION_THRESHOLD:
                     print(f"Recognized as {person_name} with confidence {confidence_score:.2f}")
@@ -107,6 +114,22 @@ def recognize(detectedFace):
         print("No known faces. Storing first face.")
         return store_new_face(temp_face_path, recognized_faces)
 
+# Store new face in a subdirectory (Prompt for Name)
+def store_new_face(face_path, recognized_faces):
+    person_name = input("Enter the person's name: ").strip()
+    person_folder = os.path.join(learned_faces, person_name)
+    os.makedirs(person_folder, exist_ok=True)
+
+    new_face_path = os.path.join(person_folder, f"face_{len(os.listdir(person_folder))}.jpg")
+    os.rename(face_path, new_face_path)
+
+    print(f"Saved new face as {new_face_path}")
+
+    # Update recognition records
+    recognized_faces[person_name] = 1
+    save_recognized_faces(recognized_faces)
+
+    return person_name
 
 # Save additional images to an existing person's folder
 def save_to_existing(person_name, face_path):
