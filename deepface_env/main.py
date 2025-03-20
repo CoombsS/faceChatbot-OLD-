@@ -11,7 +11,6 @@ os.makedirs(learned_faces, exist_ok=True)
 
 # Path for storing recognized faces data
 recognized_faces_file = "recognized_faces.json"
-RECOGNITION_THRESHOLD = 0.4  # Confidence threshold for recognition success
 
 # Load recognized faces data
 def load_recognized_faces():
@@ -27,7 +26,7 @@ def save_recognized_faces(data):
 
 # Detect a face
 def detect():
-    cam = cv2.VideoCapture(0)  # Initialize inside function
+    cam = cv2.VideoCapture(0)
     if not cam.isOpened():
         print("Error: Unable to access the webcam.")
         return None
@@ -75,24 +74,11 @@ def recognize(detected_face):
             if results and not results[0].empty:
                 identity_path = results[0]['identity'][0]
                 person_name = os.path.basename(os.path.dirname(identity_path))
-                
-                # Check for available confidence score key
-                confidence_keys = ['VGG-Face_cosine', 'Facenet_cosine', 'ArcFace_cosine']
-                confidence_score = None
-                for key in confidence_keys:
-                    if key in results[0]:
-                        confidence_score = results[0][key][0]
-                        break
-                
-                if confidence_score is not None and confidence_score < RECOGNITION_THRESHOLD:
-                    print(f"Recognized as {person_name} with confidence {confidence_score:.2f}")
-                    save_to_existing(person_name, temp_face_path)
-                    recognized_faces[person_name] = recognized_faces.get(person_name, 0) + 1
-                    save_recognized_faces(recognized_faces)
-                    return person_name
-                else:
-                    print("Face not recognized confidently. Storing as a new entry.")
-                    return store_new_face(temp_face_path, recognized_faces)
+                print(f"Recognized as {person_name}")
+                save_to_existing(person_name, temp_face_path)
+                recognized_faces[person_name] = recognized_faces.get(person_name, 0) + 1
+                save_recognized_faces(recognized_faces)
+                return person_name
             else:
                 print("No match found. Storing as a new face.")
                 return store_new_face(temp_face_path, recognized_faces)
@@ -105,7 +91,7 @@ def recognize(detected_face):
 
 # Store new face
 def store_new_face(face_path, recognized_faces):
-    print("Storing new face...")  # Debugging statement
+    print("Storing new face...")
     while True:
         try:
             person_name = input("Enter the person's name: ").strip()
