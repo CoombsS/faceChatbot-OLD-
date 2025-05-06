@@ -3,19 +3,23 @@ import requests
 import streamlit as st
 from dotenv import load_dotenv
 from datetime import datetime
+import faceDetectionAndRecognition as FDR
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '.env'))
 
-# Get the key  
-openai_api_key = os.getenv("OPENAI_API_KEY")
-print(f"Loaded API Key: {openai_api_key}")  # Debugging
+# Initialize userName as "Guest"
+if "userName" not in st.session_state:
+    st.session_state.userName = "Guest"
 
+# Load API key
+openai_api_key = os.getenv("OPENAI_API_KEY")
 if not openai_api_key:
     raise ValueError("OpenAI API key is not set in environment variables.")
 
-# --- page setup ---
-st.set_page_config(layout="wide", page_title="Chatbot Frontend Testing")
-st.title("Chatbot Frontend Testing")
+# PAGE SETUP
+st.set_page_config(layout="wide", page_title="Chatbot Frontend")
+st.title("Chatbot Frontend")
+st.subheader(f"Welcome {st.session_state.userName}!")
 
 st.markdown("""
     <style>
@@ -62,40 +66,69 @@ st.markdown("""
             margin-top: 2px;
             display: block;
         }
-        input[type="text"] {
-            background-color: #ffffff20;
-            color: white;
-            padding: 10px;
-            border-radius: 10px;
-            border: 1px solid #fff;
-            width: 100%;
-            box-sizing: border-box;
-        }
-        .stButton button {
-            background-color: #4CAF50;
-            color: white;
-            padding: 10px 20px;
-            border-radius: 10px;
-            font-size: 1.1em;
+    </style>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+    <style>
+        .stButton > button {
+            background-color: #4CAF50; /* Green background */
+            color: white; /* White text */
             border: none;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
             cursor: pointer;
+            border-radius: 8px; /* Rounded corners */
         }
-        .stButton button:hover {
-            background-color: #45a049;
+        .stButton > button:hover {
+            background-color: #45a049; /* Darker green on hover */
         }
     </style>
 """, unsafe_allow_html=True)
 
+# Initialize chat history
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
-# Formatting (sender, message, timestamp) for chat history
+# Filter out malformed history
 st.session_state.chat_history = [
     entry for entry in st.session_state.chat_history
     if isinstance(entry, tuple) and len(entry) == 3
 ]
 
-# --- chat bubbles ---
+# Save chat history to file
+def saveChat(userName):
+    with open(f"chat_history_{userName}.txt", "w") as f:
+        for sender, message, timestamp in st.session_state.chat_history:
+            f.write(f"{timestamp} - {sender}: {message}\n")
+    st.success("Chat history saved!")
+
+# Load chat history from file
+def loadChat(userName):
+    filename = f"chat_history_{userName}.txt"
+    if os.path.exists(filename):
+        with open(filename, "r") as f:
+            lines = f.readlines()
+            history = []
+            for line in lines:
+                try:
+                    timestamp, rest = line.strip().split(" - ", 1)
+                    sender, message = rest.split(": ", 1)
+                    sender = sender.strip().lower()
+                    history.append((sender, message, timestamp))
+                except ValueError:
+                    continue
+            st.session_state.chat_history = history
+        st.success(f"Previous chat history loaded for {userName}")
+    else:
+        st.session_state.chat_history = []
+        st.info("No previous chat history found.")
+
+# Render chat bubbles
 chat_html = '<div class="chat-container">'
 for sender, message, timestamp in reversed(st.session_state.chat_history):
     if sender == "user":
@@ -113,21 +146,10 @@ for sender, message, timestamp in reversed(st.session_state.chat_history):
 chat_html += '</div>'
 st.markdown(chat_html, unsafe_allow_html=True)
 
-# --- Auto-scroll ---
-st.markdown("""
-    <script>
-        const chatContainer = parent.document.querySelector('.chat-container');
-        if (chatContainer) {
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-        }
-    </script>
-""", unsafe_allow_html=True)
-
-# --- Input field ---
+# Input handling
 input_key = "question_input"
 placeholder = st.empty()
 
-# --- user input and bot replies ---
 def handle_input():
     user_input = st.session_state.get(input_key, "").strip()
     if user_input:
@@ -136,9 +158,9 @@ def handle_input():
 
         with st.spinner("Thinking..."):
             conversation = [
-                {"role": "user" if sender == "user" else "assistant", "content": msg}
-                for sender, msg, _ in st.session_state.chat_history
-            ]
+    {"role": "user" if sender == "user" else "assistant", "content": msg, "timestamp": timestamp}
+    for sender, msg, timestamp in st.session_state.chat_history]
+
             conversation.append({"role": "user", "content": user_input})
 
             response = requests.post(
@@ -163,23 +185,43 @@ def handle_input():
 
         st.session_state[input_key] = ""
 
-# --- Button Row: Clear Chat (left), Send (center), Exit App (right) ---
-left_col, middle_col, right_col = st.columns([1, 1, 1]) #WHY WONT YOU WORK?
+# Buttons
+clearChat_col, send_col, endChat_col, saveChat_col, detect_col = st.columns([1, 0.3, 0.3, 0.5, 1])
 
-with left_col:
+with clearChat_col:
     if st.button("Clear Chat"):
         st.session_state.chat_history = []
 
-with middle_col:
+with send_col:
     if st.button("Send", key="send_button"):
         handle_input()
 
-with right_col:
+with endChat_col:
     if st.button("End Chat"):
         st.success("Chat has ended. Please close the tab or refresh to restart.")
         st.stop()
 
-# --- Chat Input ---
+with saveChat_col:
+    if st.session_state.userName != "Guest":
+        if st.button("Save Chat"):
+            saveChat(st.session_state.userName)
+    else:
+        if st.button("Save Chat"):
+            st.warning("User not detected. Please run face detection or create a user.")
+
+with detect_col:
+    if st.button("Recognize Me"):
+        detectedName = FDR.detect()
+        if detectedName:
+            st.session_state.userName = detectedName
+            loadChat(detectedName)
+            st.session_state.chat_history.append(("bot", f"Welcome back, {detectedName}!"))
+            st.success(f"User detected: {detectedName}")
+        else:
+            st.error("No face detected.")
+            st.session_state.chat_history.append(("bot", "No face detected."))
+
+# User input field
 user_input = placeholder.text_input(
     "Your message:",
     key=input_key,
