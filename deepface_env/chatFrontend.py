@@ -161,7 +161,7 @@ def handle_input():
     {"role": "user" if sender == "user" else "assistant", "content": msg, "timestamp": timestamp}
     for sender, msg, timestamp in st.session_state.chat_history]
 
-            conversation.append({"role": "user", "content": user_input})
+            conversation.append({"role": "user", "content": user_input, "timestamp": timestamp})
 
             response = requests.post(
                 "https://api.openai.com/v1/chat/completions",
